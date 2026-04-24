@@ -144,7 +144,7 @@ Nous allons dans ce scénario **détruire notre Pod Kubernetes**. Ceci simulera 
 
 **Destruction du pod :** Ci-dessous, la cible de notre scénario   
   
-![Screenshot Actions](scenario1.png)  
+![alt text](status1.png)
 
 Nous perdons donc ici notre application mais pas notre base de données puisque celle-ci est déposée dans le PVC pra-data hors du pod.  
 
