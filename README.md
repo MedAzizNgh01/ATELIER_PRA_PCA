@@ -231,27 +231,55 @@ Faites preuve de pédagogie et soyez clair dans vos explications et procedures d
 **Exercice 1 :**  
 Quels sont les composants dont la perte entraîne une perte de données ?  
   
-*..Répondez à cet exercice ici..*
+*Les données sont perdues si on supprime :
+
+le PVC pra-data (il contient la base de données)
+le stockage physique associé au PVC
+
+Donc, toute suppression du stockage persistant principal entraîne une perte de données.*
 
 **Exercice 2 :**  
 Expliquez nous pourquoi nous n'avons pas perdu les données lors de la supression du PVC pra-data  
   
-*..Répondez à cet exercice ici..*
+*Nous n’avons pas perdu les données car :
+
+les données sont copiées régulièrement vers un PVC de sauvegarde (pra-backup)
+un CronJob fait des sauvegardes automatiques
+un Job permet de restaurer les données depuis la sauvegarde
+
+Donc même si le PVC principal est supprimé, les données existent encore dans le backup.*
 
 **Exercice 3 :**  
 Quels sont les RTO et RPO de cette solution ?  
   
-*..Répondez à cet exercice ici..*
+*RTO : quelques minutes (temps pour recréer et restaurer l’application)
+ RPO : dépend de la fréquence des sauvegardes *
 
 **Exercice 4 :**  
 Pourquoi cette solution (cet atelier) ne peux pas être utilisé dans un vrai environnement de production ? Que manque-t-il ?   
   
-*..Répondez à cet exercice ici..*
+*Cette solution n’est pas adaptée à la production car :
+
+-SQLite n’est pas une base de données robuste
+-pas de haute disponibilité réelle
+-pas de réplication des données en temps réel
+-sauvegardes limitées et locales
+-manque de monitoring et alerting
+-restauration encore manuelle*
   
 **Exercice 5 :**  
 Proposez une archtecture plus robuste.   
   
-*..Répondez à cet exercice ici..*
+*Une meilleure architecture serait :
+
+-un cluster Kubernetes en haute disponibilité
+-plusieurs replicas de l’application
+-une base de données PostgreSQL ou MySQL en cluster
+-stockage externe fiable (cloud ou Ceph)
+-sauvegardes automatiques vers S3 ou équivalent
+-outil de backup comme Velero
+-monitoring avec Prometheus et Grafana
+-gestion des secrets avec Vault*
 
 ---------------------------------------------------
 Séquence 6 : Ateliers  
@@ -269,7 +297,74 @@ Difficulté : Moyenne (~2 heures)
 ### **Atelier 2 : Choisir notre point de restauration**  
 Aujourd’hui nous restaurobs “le dernier backup”. Nous souhaitons **ajouter la capacité de choisir un point de restauration**.
 
-*..Décrir ici votre procédure de restauration (votre runbook)..*  
+* 1. Lister les backups disponibles
+
+Utiliser un pod temporaire pour accéder au volume de backup :
+
+kubectl -n pra run debug-backup \
+  --rm -it \
+  --restart=Never \
+  --image=alpine \
+  --overrides='{
+    "spec": {
+      "containers": [{
+        "name": "debug",
+        "image": "alpine",
+        "command": ["sh"],
+        "stdin": true,
+        "tty": true,
+        "volumeMounts": [{
+          "name": "backup",
+          "mountPath": "/backup"
+        }]
+      }],
+      "volumes": [{
+        "name": "backup",
+        "persistentVolumeClaim": {
+          "claimName": "pra-backup"
+        }
+      }]
+    }
+  }'
+
+Puis dans le pod :
+
+ls -lh /backup
+
+Quitter :
+
+exit
+2. Choisir un point de restauration
+
+Identifier le fichier de backup à restaurer, par exemple :
+
+app-1777033621.db
+3. Arrêter l’application et suspendre les sauvegardes
+kubectl -n pra scale deployment flask --replicas=0
+kubectl -n pra patch cronjob sqlite-backup -p '{"spec":{"suspend":true}}'
+kubectl -n pra delete job --all
+4. Restaurer la base de données
+
+Modifier le fichier :
+
+pra/50-job-restore.yaml
+
+ Remplacer le nom du backup par celui choisi.
+
+Puis appliquer :
+
+kubectl apply -f pra/50-job-restore.yaml
+5. Relancer l’application
+kubectl -n pra scale deployment flask --replicas=1
+kubectl -n pra port-forward svc/flask 8080:80 >/tmp/web.log 2>&1 &
+6. Vérifier la restauration
+
+Ouvrir dans le navigateur :
+
+http://***/consultation
+http://***/count
+7. Réactiver les sauvegardes automatiques
+kubectl -n pra patch cronjob sqlite-backup -p '{"spec":{"suspend":false}}'*  
   
 ---------------------------------------------------
 Evaluation
