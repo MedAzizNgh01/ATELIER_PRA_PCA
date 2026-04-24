@@ -300,7 +300,7 @@ Aujourd’hui nous restaurobs “le dernier backup”. Nous souhaitons **ajouter
 * 1. Lister les backups disponibles
 
 Utiliser un pod temporaire pour accéder au volume de backup :
-
+```
 kubectl -n pra run debug-backup \
   --rm -it \
   --restart=Never \
@@ -326,46 +326,53 @@ kubectl -n pra run debug-backup \
       }]
     }
   }'
-
+```
 Puis dans le pod :
-
+```
 ls -lh /backup
-
+```
 Quitter :
-
+```
 exit
+```
 2. Choisir un point de restauration
 
 Identifier le fichier de backup à restaurer, par exemple :
-
+```
 app-1777033621.db
 3. Arrêter l’application et suspendre les sauvegardes
 kubectl -n pra scale deployment flask --replicas=0
 kubectl -n pra patch cronjob sqlite-backup -p '{"spec":{"suspend":true}}'
 kubectl -n pra delete job --all
+```
 4. Restaurer la base de données
 
 Modifier le fichier :
-
+```
 pra/50-job-restore.yaml
-
+```
  Remplacer le nom du backup par celui choisi.
 
 Puis appliquer :
-
+```
 kubectl apply -f pra/50-job-restore.yaml
+```
 5. Relancer l’application
+```
 kubectl -n pra scale deployment flask --replicas=1
 kubectl -n pra port-forward svc/flask 8080:80 >/tmp/web.log 2>&1 &
-6. Vérifier la restauration
+```
+7. Vérifier la restauration
 
 Ouvrir dans le navigateur :
-
+```
 http://***/consultation
 http://***/count
+```
 7. Réactiver les sauvegardes automatiques
+```
 kubectl -n pra patch cronjob sqlite-backup -p '{"spec":{"suspend":false}}'*  
-  
+ ``` 
 ---------------------------------------------------
 Evaluation
 ---------------------------------------------------
